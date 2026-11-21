@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+# असली merchant या transaction डेटा कभी commit न करें
+*.real.csv
+rules.local.json

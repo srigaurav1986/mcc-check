@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcc-check"
+version = "0.1.0"
+description = "MCC suggestion, MDR calculation and merchant audit for Indian payments"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+mcc-check = "mcc_check.cli:main"
+
+[tool.setuptools]
+packages = ["mcc_check"]
