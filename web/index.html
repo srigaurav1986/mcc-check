@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCC जाँचक</title>
+<style>
+  :root { --bg:#f5f7fa; --card:#ffffff; --ink:#1d2433; --muted:#5b6475; --accent:#1f6feb; --warn:#b45309; --bad:#b42318; --ok:#067647; --line:#d9dee7; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Noto Sans Devanagari", "Mangal", "Nirmala UI", system-ui, sans-serif; background:var(--bg); color:var(--ink); font-size:17px; line-height:1.6; }
+  header { background:var(--card); border-bottom:1px solid var(--line); padding:18px 20px; }
+  header h1 { margin:0 0 4px; font-size:24px; }
+  header p { margin:0; color:var(--muted); font-size:15px; }
+  main { max-width:860px; margin:0 auto; padding:16px; }
+  .notice { background:#fff8e6; border:1px solid #f1d28a; border-radius:10px; padding:12px 14px; font-size:14px; color:#5c4a14; margin-bottom:16px; }
+  .tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .tab { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 16px; font-size:16px; cursor:pointer; font-family:inherit; color:var(--ink); }
+  .tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .panel { display:none; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; }
+  .panel.active { display:block; }
+  label { display:block; font-weight:600; margin:10px 0 6px; }
+  input[type=text], input[type=number], select, textarea { width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:10px; font-size:16px; font-family:inherit; background:#fff; color:var(--ink); }
+  textarea { min-height:140px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size:14px; }
+  .btn { background:var(--accent); color:#fff; border:none; border-radius:10px; padding:11px 18px; font-size:16px; cursor:pointer; font-family:inherit; margin-top:12px; margin-right:6px; }
+  .btn.secondary { background:#eef2f8; color:var(--ink); border:1px solid var(--line); }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  .row > div { flex:1; min-width:180px; }
+  .result { margin-top:16px; }
+  .card { border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:10px; background:#fff; }
+  .card h3 { margin:0 0 6px; font-size:17px; }
+  .card .meta { color:var(--muted); font-size:14px; }
+  .tag { display:inline-block; padding:2px 10px; border-radius:999px; font-size:13px; font-weight:600; margin-right:6px; }
+  .t-over { background:#fdecea; color:var(--bad); }
+  .t-review { background:#fff4e5; color:var(--warn); }
+  .t-under { background:#e6f4ea; color:var(--ok); }
+  .t-info { background:#eef2f8; color:var(--muted); }
+  .draft { white-space:pre-wrap; background:#f7f9fc; border:1px dashed var(--line); border-radius:10px; padding:12px; font-size:14px; display:none; margin-top:10px; }
+  .empty { color:var(--muted); font-style:italic; }
+  .error { color:var(--bad); font-weight:600; margin-top:12px; }
+  footer { color:var(--muted); font-size:13px; text-align:center; padding:24px 12px; }
+  @media (max-width:520px){ body{font-size:16px;} .tab{flex:1;} }
+</style>
+</head>
+<body>
+<header>
+  <h1>MCC जाँचक</h1>
+  <p>दुकान का MCC, MDR का हिसाब, और statement की जाँच। सब कुछ आपके ब्राउज़र में होता है, कोई डेटा कहीं नहीं भेजा जाता।</p>
+</header>
+
+<main>
+  <div class="notice">
+    यह एक अनुमान का उपकरण है। MCC का अंतिम निर्णय आपका acquirer या payment service provider लेता है, और MDR की वास्तविक दर आपका बैंक तय करता है। यह कानूनी या वित्तीय सलाह नहीं है। MCC बदलने के लिए यह tool कोई सलाह नहीं देता।
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="p-mcc">MCC खोजें</button>
+    <button class="tab" data-tab="p-mdr">MDR हिसाब</button>
+    <button class="tab" data-tab="p-audit">Statement जाँच</button>
+  </div>
+
+  <!-- MCC panel -->
+  <section class="panel active" id="p-mcc">
+    <label for="mcc-name">दुकान या merchant का नाम (हिंदी या अंग्रेज़ी में)</label>
+    <input type="text" id="mcc-name" placeholder="जैसे: गुप्ता मेडिकल हॉल">
+    <button class="btn" id="mcc-btn">संकेत देखें</button>
+    <div class="result" id="mcc-result"></div>
+
+    <label for="mcc-code">या MCC कोड लिखकर उसका अर्थ देखें</label>
+    <div class="row">
+      <div><input type="text" id="mcc-code" placeholder="जैसे: 5411"></div>
+      <div><button class="btn secondary" id="code-btn">अर्थ देखें</button></div>
+    </div>
+    <div class="result" id="code-result"></div>
+  </section>
+
+  <!-- MDR panel -->
+  <section class="panel" id="p-mdr">
+    <div class="row">
+      <div>
+        <label for="mdr-amount">लेनदेन की रकम (₹)</label>
+        <input type="number" id="mdr-amount" min="0" step="0.01" placeholder="जैसे: 2500">
+      </div>
+      <div>
+        <label for="mdr-instrument">भुगतान का माध्यम</label>
+        <select id="mdr-instrument"><option value="upi_p2m">UPI (सामान्य merchant भुगतान)</option></select>
+      </div>
+    </div>
+    <button class="btn" id="mdr-btn">MDR निकालें</button>
+    <div class="result" id="mdr-result"></div>
+  </section>
+
+  <!-- Audit panel -->
+  <section class="panel" id="p-audit">
+    <label for="csv-file">Statement CSV फ़ाइल चुनें</label>
+    <input type="file" id="csv-file" accept=".csv,text/csv">
+    <label for="csv-text">या नीचे सीधे CSV लिखें या चिपकाएँ</label>
+    <textarea id="csv-text" placeholder="date,amount,mdr_charged,merchant_name,assigned_mcc,instrument"></textarea>
+    <button class="btn secondary" id="sample-btn">नमूना लोड करें</button>
+    <button class="btn" id="audit-btn">जाँच करें</button>
+    <div class="result" id="audit-result"></div>
+  </section>
+</main>
+
+<footer>
+  मसौदे केवल समीक्षा का अनुरोध हैं। अंतिम निर्णय आपके acquirer या NPCI का होगा।
+</footer>
+
+<script>
+/*LOGIC_START*/
+// MCC डेटा: ISO 18245 का प्रारंभिक उपसमुच्चय, भारतीय keywords के साथ।
+const MCC_TABLE = [
+  {code:"0742", name:"Veterinary Services", hindi:"पशु चिकित्सा", kw:["veterinary","vet clinic","पशु चिकित्सा","पशु अस्पताल"]},
+  {code:"3020", name:"Airlines", hindi:"एयरलाइन", kw:["airline","airways","flight","एयरलाइन"]},
+  {code:"4111", name:"Local and Suburban Commuter Transport", hindi:"स्थानीय परिवहन", kw:["metro","local train","suburban","मेट्रो"]},
+  {code:"4112", name:"Passenger Railways", hindi:"रेलवे", kw:["railway","railways","irctc","रेलवे"]},
+  {code:"4121", name:"Taxicabs and Limousines", hindi:"टैक्सी", kw:["taxi","cab","टैक्सी"]},
+  {code:"4131", name:"Bus Lines", hindi:"बस सेवा", kw:["bus","redbus","abhibus","बस"]},
+  {code:"4215", name:"Courier Services", hindi:"कूरियर", kw:["courier","logistics","shipping","कूरियर"]},
+  {code:"4722", name:"Travel Agencies and Tour Operators", hindi:"यात्रा एजेंसी", kw:["travel","tours","tour operator","holidays","यात्रा"]},
+  {code:"4814", name:"Telecommunication Services", hindi:"दूरसंचार", kw:["telecom","mobile recharge","airtel","jio","vodafone","बीएसएनएल","मोबाइल रिचार्ज"]},
+  {code:"4900", name:"Utilities", hindi:"बिजली, पानी, गैस बिल", kw:["electricity","water bill","gas bill","utility","बिजली","पानी बिल"]},
+  {code:"5411", name:"Grocery Stores, Supermarkets", hindi:"किराना और सुपरमार्केट", kw:["grocery","kirana","supermarket","provision","किराना"]},
+  {code:"5541", name:"Service Stations", hindi:"पेट्रोल पंप", kw:["petrol","petrol pump","fuel","service station","पेट्रोल","पेट्रोल पंप"]},
+  {code:"5651", name:"Family Clothing Stores", hindi:"कपड़ों की दुकान", kw:["clothing","garments","apparel","boutique","कपड़े"]},
+  {code:"5732", name:"Electronics Stores", hindi:"इलेक्ट्रॉनिक्स", kw:["electronics","mobile shop","computer shop","इलेक्ट्रॉनिक्स"]},
+  {code:"5812", name:"Eating Places, Restaurants", hindi:"रेस्टोरेंट और ढाबा", kw:["restaurant","dhaba","cafe","bhojanalaya","ढाबा","रेस्टोरेंट","होटल"]},
+  {code:"5814", name:"Fast Food Restaurants", hindi:"फास्ट फ़ूड", kw:["fast food","pizza","burger","roll","chaat","चाट"]},
+  {code:"5912", name:"Drug Stores, Pharmacies", hindi:"दवा दुकान", kw:["pharmacy","medical","medicals","chemist","dawai","मेडिकल","दवाई","दवा"]},
+  {code:"5999", name:"Miscellaneous and Specialty Retail Stores", hindi:"विविध खुदरा दुकान", kw:[]},
+  {code:"6012", name:"Financial Institutions", hindi:"वित्तीय संस्थान", kw:["loan","emi","nbfc","लोन","ईएमआई"]},
+  {code:"6300", name:"Insurance Sales, Underwriting", hindi:"बीमा", kw:["insurance","premium","बीमा"]},
+  {code:"7011", name:"Hotels, Motels, Resorts", hindi:"होटल और रिसॉर्ट", kw:["hotel","resort","lodge","guest house","होटल","रिसॉर्ट"]},
+  {code:"7322", name:"Debt Collection Agencies", hindi:"वसूली एजेंसी", kw:["debt collection","recovery agency","वसूली"]},
+  {code:"7832", name:"Motion Picture Theaters", hindi:"सिनेमा", kw:["cinema","movie","multiplex","theatre","सिनेमा"]},
+  {code:"8062", name:"Hospitals", hindi:"अस्पताल", kw:["hospital","nursing home","अस्पताल"]},
+  {code:"8099", name:"Medical Services and Health Practitioners", hindi:"स्वास्थ्य सेवा", kw:["clinic","diagnostic","diagnostics","lab","dental","doctor","क्लिनिक","लैब"]},
+  {code:"8211", name:"Elementary and Secondary Schools", hindi:"स्कूल", kw:["school","vidyalaya","स्कूल","विद्यालय"]},
+  {code:"8220", name:"Colleges and Universities", hindi:"कॉलेज और विश्वविद्यालय", kw:["college","university","institute","कॉलेज","विश्वविद्यालय"]},
+  {code:"8398", name:"Charitable and Social Service Organizations", hindi:"दान और सामाजिक संस्था", kw:["donation","charity","trust","ngo","दान"]},
+  {code:"9311", name:"Tax Payments", hindi:"कर भुगतान", kw:["tax","income tax","gst payment","कर"]},
+  {code:"9399", name:"Government Services", hindi:"सरकारी सेवा", kw:["government","municipal","govt","सरकारी","नगर निगम"]},
+];
+const BY_CODE = Object.fromEntries(MCC_TABLE.map(e => [e.code, e]));
+
+// MDR नियम: प्रकाशित बैंक सूचना पर आधारित डिफ़ॉल्ट, जो बदल सकते हैं।
+const RULES = {
+  upi_p2m: {rate:0.004, cap:300, zero_below:2000}
+};
+
+function normalize(text) {
+  const t = (text || "").toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, " ").trim().split(/\s+/).join(" ");
+  return " " + t + " ";
+}
+
+function suggest(text, limit = 3) {
+  const h = normalize(text);
+  const res = [];
+  for (const e of MCC_TABLE) {
+    const matched = e.kw.filter(k => h.includes(" " + k + " "));
+    if (matched.length) {
+      const score = matched.reduce((s, k) => s + [...k].length, 0);
+      res.push({code:e.code, name:e.name, hindi:e.hindi, score, matched});
+    }
+  }
+  res.sort((a, b) => (b.score - a.score) || a.code.localeCompare(b.code));
+  return res.slice(0, limit);
+}
+
+function confidence(res) {
+  if (!res.length) return 0;
+  const total = res.reduce((s, r) => s + r.score, 0);
+  return Math.round((res[0].score / total) * 100) / 100;
+}
+
+function expectedMdr(amount, rule) {
+  if (amount <= rule.zero_below) return 0;
+  let fee = amount * rule.rate;
+  if (rule.cap != null) fee = Math.min(fee, rule.cap);
+  return Math.round((fee + Number.EPSILON) * 100) / 100;
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = "", quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; } else quoted = false;
+      } else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else if (c !== "\r") field += c;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim() !== ""));
+}
+
+function audit(text, tolerance = 0.05, reviewConfidence = 0.5) {
+  const rows = parseCsv(text);
+  if (!rows.length) throw new Error("फ़ाइल खाली है।");
+  const headers = rows[0].map(h => h.trim());
+  const required = ["date", "amount", "mdr_charged", "merchant_name", "assigned_mcc"];
+  const missing = required.filter(r => !headers.includes(r));
+  if (missing.length) throw new Error("ज़रूरी कॉलम नहीं मिले: " + missing.join(", "));
+
+  const findings = [], errors = [];
+  rows.slice(1).forEach((cells, idx) => {
+    const lineNo = idx + 2;
+    const raw = {};
+    headers.forEach((h, i) => raw[h] = (cells[i] || "").trim());
+    const amount = Number(raw.amount);
+    const charged = Number(raw.mdr_charged || "0");
+    const instrument = raw.instrument || "upi_p2m";
+    if (!raw.date || isNaN(amount) || amount <= 0 || isNaN(charged)) {
+      errors.push("पंक्ति " + lineNo + ": रकम, शुल्क या तारीख गलत है।");
+      return;
+    }
+    const row = {date: raw.date, amount, charged, merchant: raw.merchant_name, assigned: raw.assigned_mcc, instrument};
+
+    const rule = RULES[instrument];
+    if (!rule) {
+      findings.push({kind:"NO_RULE", row, message:"इस माध्यम के लिए नियम उपलब्ध नहीं है, जाँच छोड़ी गई।"});
+    } else {
+      const expected = expectedMdr(amount, rule);
+      const diff = Math.round((charged - expected) * 100) / 100;
+      if (diff > tolerance) {
+        findings.push({kind:"OVERCHARGE", row, expected, message:`कटा शुल्क ₹${charged} है, नियम से ₹${expected} बनता है। अंतर ₹${diff}।`});
+      } else if (diff < -tolerance) {
+        findings.push({kind:"UNDERCHARGE", row, expected, message:`कटा शुल्क ₹${charged} है, नियम से ₹${expected} बनता है। यह जानकारी के लिए है।`});
+      }
+    }
+
+    const res = suggest(row.merchant);
+    const top = res[0];
+    if (top && top.code !== row.assigned && confidence(res) >= reviewConfidence) {
+      findings.push({kind:"MCC_REVIEW", row, suggested: top.code,
+        message:`नाम के संकेत '${top.matched.join(", ")}' से ${top.code} (${top.name}) दिखता है, जबकि assign किया गया MCC ${row.assigned} है। यह समीक्षा का संकेत है, निर्णय नहीं।`});
+    }
+  });
+  return {findings, errors};
+}
+
+function disputeDraft(f) {
+  const r = f.row;
+  const title = {OVERCHARGE:"MDR अधिक कटने की समीक्षा", MCC_REVIEW:"MCC वर्गीकरण की समीक्षा"}[f.kind] || "जाँच";
+  const label = c => (BY_CODE[c] ? BY_CODE[c].hindi : "अज्ञात");
+  const lines = [
+    "विषय: " + title, "",
+    "तारीख: " + r.date,
+    "Merchant का नाम: " + (r.merchant || "उपलब्ध नहीं"),
+    "रकम: ₹" + r.amount,
+    "कटा MDR: ₹" + r.charged,
+    "Assign किया गया MCC: " + r.assigned + " (" + label(r.assigned) + ")",
+  ];
+  if (f.expected != null) lines.push("नियम से अपेक्षित MDR: ₹" + f.expected);
+  if (f.suggested) lines.push("नाम के आधार पर संकेतित MCC: " + f.suggested + " (" + label(f.suggested) + ")");
+  lines.push("", "जाँच का परिणाम: " + f.message, "",
+    "अनुरोध: कृपया इस लेनदेन के MCC वर्गीकरण और लागू MDR की समीक्षा करें।",
+    "यह जाँच एक अनुमान पर आधारित है। अंतिम निर्णय acquirer या NPCI का होगा.");
+  return lines.join("\n");
+}
+/*LOGIC_END*/
+
+// ---------- UI ----------
+const SAMPLE = `date,amount,mdr_charged,merchant_name,assigned_mcc,instrument
+2026-11-02,2500,10.00,Sharma Kirana Store,5411,upi_p2m
+2026-11-03,5000,25.00,Gupta Medical Hall,5999,upi_p2m
+2026-11-04,1500,0.00,Ravi Dhaba,5812,upi_p2m
+2026-11-05,3000,12.00,City Petrol Pump,5541,upi_p2m`;
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.tab).classList.add("active");
+  });
+});
+
+function renderMccResults(list, box) {
+  if (!list.length) { box.innerHTML = '<p class="empty">कोई संकेत नहीं मिला। नाम या कारोबार का कोई पहचाना हुआ शब्द लिखें।</p>'; return; }
+  const conf = confidence(list);
+  box.innerHTML = list.map(r =>
+    `<div class="card"><h3>${esc(r.code)}: ${esc(r.hindi)}</h3>
+     <div class="meta">${esc(r.name)} · मिले शब्द: ${esc(r.matched.join(", "))}</div></div>`
+  ).join("") + `<p class="meta">विश्वास: ${conf}। यह केवल संकेत है, अंतिम MCC acquirer तय करता है।</p>`;
+}
+
+document.getElementById("mcc-btn").addEventListener("click", () => {
+  renderMccResults(suggest(document.getElementById("mcc-name").value), document.getElementById("mcc-result"));
+});
+
+document.getElementById("code-btn").addEventListener("click", () => {
+  const code = document.getElementById("mcc-code").value.trim();
+  const box = document.getElementById("code-result");
+  const e = BY_CODE[code];
+  box.innerHTML = e
+    ? `<div class="card"><h3>${esc(e.code)}: ${esc(e.hindi)}</h3><div class="meta">${esc(e.name)}</div></div>`
+    : `<p class="empty">MCC ${esc(code)} हमारी सूची में नहीं है। आधिकारिक ISO 18245 सूची देखें।</p>`;
+});
+
+document.getElementById("mdr-btn").addEventListener("click", () => {
+  const amount = Number(document.getElementById("mdr-amount").value);
+  const box = document.getElementById("mdr-result");
+  if (!amount || amount <= 0) { box.innerHTML = '<p class="error">कृपया सही रकम लिखें।</p>'; return; }
+  const fee = expectedMdr(amount, RULES.upi_p2m);
+  box.innerHTML = `<div class="card"><h3>अनुमानित MDR: ₹${fee.toFixed(2)}</h3>
+    <div class="meta">यह प्रकाशित नियमों पर आधारित अनुमान है। वास्तविक दर आपका बैंक तय करता है। ₹2,000 तक शुल्क शून्य माना गया है, और अधिकतम ₹300 है।</div></div>`;
+});
+
+document.getElementById("csv-file").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (file) document.getElementById("csv-text").value = await file.text();
+});
+
+document.getElementById("sample-btn").addEventListener("click", () => {
+  document.getElementById("csv-text").value = SAMPLE;
+});
+
+document.getElementById("audit-btn").addEventListener("click", () => {
+  const box = document.getElementById("audit-result");
+  const text = document.getElementById("csv-text").value;
+  if (!text.trim()) { box.innerHTML = '<p class="error">पहले CSV फ़ाइल चुनें या डेटा चिपकाएँ।</p>'; return; }
+  let out;
+  try { out = audit(text); }
+  catch (err) { box.innerHTML = `<p class="error">${esc(err.message)}</p>`; return; }
+
+  const tagFor = k => ({OVERCHARGE:'<span class="tag t-over">अधिक शुल्क</span>', MCC_REVIEW:'<span class="tag t-review">MCC समीक्षा</span>', UNDERCHARGE:'<span class="tag t-under">कम शुल्क</span>', NO_RULE:'<span class="tag t-info">नियम नहीं</span>'}[k] || "");
+  let html = "";
+  if (out.errors.length) html += out.errors.map(e => `<p class="error">${esc(e)}</p>`).join("");
+  if (!out.findings.length) {
+    html += '<p class="empty">कोई जाँच-योग्य गड़बड़ी नहीं मिली।</p>';
+  } else {
+    out.findings.forEach((f, i) => {
+      const draftable = f.kind === "OVERCHARGE" || f.kind === "MCC_REVIEW";
+      html += `<div class="card">${tagFor(f.kind)}<h3>${esc(f.row.date)} · ${esc(f.row.merchant)}</h3>
+        <div class="meta">${esc(f.message)}</div>
+        ${draftable ? `<button class="btn secondary" data-draft="${i}">बैंक को भेजने का मसौदा</button>
+        <pre class="draft" id="draft-${i}">${esc(disputeDraft(f))}</pre>` : ""}</div>`;
+    });
+  }
+  box.innerHTML = html;
+
+  box.querySelectorAll("[data-draft]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const d = document.getElementById("draft-" + btn.dataset.draft);
+      const visible = d.style.display === "block";
+      d.style.display = visible ? "none" : "block";
+      btn.textContent = visible ? "बैंक को भेजने का मसौदा" : "मसौदा छिपाएँ";
+    });
+  });
+});
+</script>
+</body>
+</html>
