@@ -61,7 +61,9 @@
   <!-- MCC panel -->
   <section class="panel active" id="p-mcc">
     <label for="mcc-name">दुकान या merchant का नाम (हिंदी या अंग्रेज़ी में)</label>
-    <input type="text" id="mcc-name" placeholder="जैसे: गुप्ता मेडिकल हॉल">
+    <input type="text" id="mcc-name" placeholder="जैसे: गुप्ता मेडिकल हॉल" autocomplete="off">
+    <label for="mcc-category">या अपना कारोबार चुनें (नाम में शब्द न हो तो यह उपयोगी है)</label>
+    <select id="mcc-category"><option value="">— कारोबार चुनें —</option></select>
     <button class="btn" id="mcc-btn">संकेत देखें</button>
     <div class="result" id="mcc-result"></div>
 
@@ -284,17 +286,48 @@ document.querySelectorAll(".tab").forEach(btn => {
 });
 
 function renderMccResults(list, box) {
-  if (!list.length) { box.innerHTML = '<p class="empty">कोई संकेत नहीं मिला। नाम या कारोबार का कोई पहचाना हुआ शब्द लिखें।</p>'; return; }
+  if (!list.length) {
+    box.innerHTML = '<p class="empty">नाम में कोई पहचाना शब्द नहीं मिला। जैसे "किराना", "दवा", "ढाबा", "पेट्रोल पंप" लिखें, या ऊपर से कारोबार चुनें।</p>';
+    return;
+  }
   const conf = confidence(list);
   box.innerHTML = list.map(r =>
     `<div class="card"><h3>${esc(r.code)}: ${esc(r.hindi)}</h3>
      <div class="meta">${esc(r.name)} · मिले शब्द: ${esc(r.matched.join(", "))}</div></div>`
-  ).join("") + `<p class="meta">विश्वास: ${conf}। यह केवल संकेत है, अंतिम MCC acquirer तय करता है।</p>`;
+  ).join("") + (list[0].matched[0] === "आपका चुनाव"
+    ? `<p class="meta">आपने यह कारोबार चुना है। अंतिम MCC acquirer तय करता है।</p>`
+    : `<p class="meta">विश्वास: ${conf}। यह केवल संकेत है, अंतिम MCC acquirer तय करता है।</p>`);
 }
 
-document.getElementById("mcc-btn").addEventListener("click", () => {
-  renderMccResults(suggest(document.getElementById("mcc-name").value), document.getElementById("mcc-result"));
+// कारोबार की सूची भरें
+const catSelect = document.getElementById("mcc-category");
+MCC_TABLE.forEach(e => {
+  const opt = document.createElement("option");
+  opt.value = e.code;
+  opt.textContent = e.hindi;
+  catSelect.appendChild(opt);
 });
+
+function runMccSearch() {
+  const box = document.getElementById("mcc-result");
+  const name = document.getElementById("mcc-name").value.trim();
+  const category = catSelect.value;
+  if (!name && !category) {
+    box.innerHTML = '<p class="error">पहले दुकान का नाम लिखें, या ऊपर से कारोबार चुनें।</p>';
+    return;
+  }
+  let list = suggest(name);
+  if (category) {
+    // चुना गया कारोबार सबसे ऊपर रखें
+    const chosen = BY_CODE[category];
+    list = [{code: chosen.code, name: chosen.name, hindi: chosen.hindi, score: 0, matched: ["आपका चुनाव"]},
+            ...list.filter(r => r.code !== category)];
+  }
+  renderMccResults(list, box);
+}
+
+document.getElementById("mcc-btn").addEventListener("click", runMccSearch);
+document.getElementById("mcc-name").addEventListener("keydown", e => { if (e.key === "Enter") runMccSearch(); });
 
 document.getElementById("code-btn").addEventListener("click", () => {
   const code = document.getElementById("mcc-code").value.trim();
