@@ -30,7 +30,7 @@ MCC_TABLE = (
     MccEntry("4900", "Utilities", "बिजली, पानी, गैस बिल", ("electricity", "water bill", "gas bill", "utility", "बिजली", "पानी बिल")),
     MccEntry("5411", "Grocery Stores, Supermarkets", "किराना और सुपरमार्केट", ("grocery", "kirana", "supermarket", "provision", "किराना")),
     MccEntry("5541", "Service Stations", "पेट्रोल पंप", ("petrol", "petrol pump", "fuel", "service station", "पेट्रोल", "पेट्रोल पंप")),
-    MccEntry("5651", "Family Clothing Stores", "कपड़ों की दुकान", ("clothing", "garments", "apparel", "boutique", "कपड़े")),
+    MccEntry("5651", "Family Clothing Stores", "कपड़ों की दुकान", ("clothing", "garments", "garment", "apparel", "boutique", "hosiery", "textile", "textiles", "cloth", "cloth house", "saree", "sarees", "readymade", "fabric", "कपड़े", "कपड़ा", "साड़ी", "होजरी", "हौज़री", "टेक्सटाइल")),
     MccEntry("5732", "Electronics Stores", "इलेक्ट्रॉनिक्स", ("electronics", "mobile shop", "computer shop", "इलेक्ट्रॉनिक्स")),
     MccEntry("5812", "Eating Places, Restaurants", "रेस्टोरेंट और ढाबा", ("restaurant", "dhaba", "cafe", "bhojanalaya", "ढाबा", "रेस्टोरेंट", "होटल")),
     MccEntry("5814", "Fast Food Restaurants", "फास्ट फ़ूड", ("fast food", "pizza", "burger", "roll", "chaat", "चाट")),
