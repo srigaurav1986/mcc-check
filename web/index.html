@@ -394,7 +394,7 @@ const AI_PROVIDERS = {
           "anthropic-version": "2023-06-01",
           "anthropic-dangerous-direct-browser-access": "true",
         },
-        body: {model: this.model, max_tokens: 200, system, messages: [{role: "user", content: user}]},
+        body: {model: this.model, max_tokens: 400, system, messages: [{role: "user", content: user}]},
       };
     },
     readText(data) { return (data.content || []).map(c => c.text || "").join(""); },
@@ -409,12 +409,15 @@ const AI_PROVIDERS = {
         body: {
           systemInstruction: {parts: [{text: system}]},
           contents: [{role: "user", parts: [{text: user}]}],
-          generationConfig: {maxOutputTokens: 200, responseMimeType: "application/json"},
+          generationConfig: {maxOutputTokens: 1024, responseMimeType: "application/json"},
         },
       };
     },
     readText(data) {
-      const parts = (((data.candidates || [])[0] || {}).content || {}).parts || [];
+      const cand = (data.candidates || [])[0] || {};
+      // Gemini का "सोच" वाला हिस्सा भी इसी सीमा में गिना जाता है। सीमा खत्म हो तो साफ़ बताएँ।
+      if (cand.finishReason === "MAX_TOKENS") throw new Error("AI का जवाब बीच में रुक गया (सीमा पूरी हुई)। फिर से कोशिश करें।");
+      const parts = (cand.content || {}).parts || [];
       // thinking वाले हिस्से (thought: true) को छोड़ें, केवल असली जवाब लें
       return parts.filter(p => !p.thought).map(p => p.text || "").join("");
     },
