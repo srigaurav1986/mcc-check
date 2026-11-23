@@ -94,8 +94,13 @@
     <button class="btn secondary" id="chat-restart">फिर से शुरू करें</button>
     <details class="ai-box">
       <summary>AI मॉडल जोड़ें (वैकल्पिक, पहले सहमति ज़रूरी)</summary>
-      <p class="meta">अगर आप AI चालू करते हैं, तो आपके लिखे कारोबार का विवरण (पहचान और संख्याएँ हटाकर) बाहरी AI सेवा को भेजा जाएगा। बैंक, खाते या लेनदेन का डेटा कभी नहीं भेजा जाता। यह डेटा हम अपने पास नहीं रखते, पर AI सेवा के अपने नियम लागू होंगे। आप कभी भी बंद कर सकते हैं।</p>
-      <label><input type="checkbox" id="ai-consent"> मैं सहमत हूँ कि ऊपर बताया गया कारोबार का विवरण AI सेवा को भेजा जाए</label>
+      <p class="meta">अगर आप AI चालू करते हैं, तो आपके लिखे कारोबार का विवरण (पहचान और संख्याएँ हटाकर) चुनी गई बाहरी AI सेवा को भेजा जाएगा। बैंक, खाते या लेनदेन का डेटा कभी नहीं भेजा जाता। यह डेटा हम अपने पास नहीं रखते, पर AI सेवा के अपने नियम लागू होंगे। Gemini की free tier पर Google आपका भेजा विवरण अपने उत्पाद सुधार के लिए इस्तेमाल कर सकता है। आप कभी भी बंद कर सकते हैं।</p>
+      <label for="ai-provider">AI सेवा चुनें</label>
+      <select id="ai-provider">
+        <option value="gemini">Google Gemini (free tier उपलब्ध)</option>
+        <option value="anthropic">Anthropic Claude</option>
+      </select>
+      <label><input type="checkbox" id="ai-consent"> मैं सहमत हूँ कि ऊपर बताया गया कारोबार का विवरण चुनी गई AI सेवा को भेजा जाए</label>
       <label for="ai-key">आपकी AI API key (यह सिर्फ़ इस ब्राउज़र टैब में रहती है, कहीं सेव नहीं होती)</label>
       <input type="password" id="ai-key" autocomplete="off" placeholder="API key यहाँ लिखें">
       <p class="meta" id="ai-status">AI बंद है। सिर्फ़ नियम-आधारित सहायक चलेगा।</p>
@@ -374,10 +379,45 @@ function agentStep(state, input) {
   return {state:s, bot:["कृपया ऊपर से कोई विकल्प चुनें।"], options:s.options || []};
 }
 // ---------- AI सहायक (वैकल्पिक, केवल सहमति के बाद) ----------
-const AI_PROVIDER = {
-  url: "https://api.anthropic.com/v1/messages",
-  model: "claude-haiku-5-5",
-  version: "2023-06-01",
+// हर provider का endpoint, model और request/response का तरीका अलग है।
+const AI_PROVIDERS = {
+  anthropic: {
+    label: "Anthropic Claude",
+    url: "https://api.anthropic.com/v1/messages",
+    model: "claude-haiku-5-5",
+    buildRequest(key, system, user) {
+      return {
+        url: this.url,
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": key,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: {model: this.model, max_tokens: 200, system, messages: [{role: "user", content: user}]},
+      };
+    },
+    readText(data) { return (data.content || []).map(c => c.text || "").join(""); },
+  },
+  gemini: {
+    label: "Google Gemini (free tier पर आपका विवरण Google सुधार के लिए इस्तेमाल कर सकता है)",
+    model: "gemini-3.5-flash",
+    buildRequest(key, system, user) {
+      return {
+        url: "https://generativelanguage.googleapis.com/v1beta/models/" + this.model + ":generateContent",
+        headers: {"content-type": "application/json", "x-goog-api-key": key},
+        body: {
+          systemInstruction: {parts: [{text: system}]},
+          contents: [{role: "user", parts: [{text: user}]}],
+          generationConfig: {maxOutputTokens: 200, responseMimeType: "application/json"},
+        },
+      };
+    },
+    readText(data) {
+      const parts = (((data.candidates || [])[0] || {}).content || {}).parts || [];
+      return parts.map(p => p.text || "").join("");
+    },
+  },
 };
 
 // भेजने से पहले पहचान और संख्याएँ हटाएँ। यह भेजे जाने वाले विवरण की आख़िरी सुरक्षा है।
@@ -411,25 +451,18 @@ function parseAiReply(raw) {
   return {code, confidence, reason: String(obj.reason_hi || "")};
 }
 
-// cfg: {consent: boolean, apiKey: string}. सहमति के बिना कुछ नहीं भेजा जाता।
+// cfg: {consent, apiKey, provider: "anthropic" | "gemini"}. सहमति के बिना कुछ नहीं भेजा जाता।
 async function aiSuggest(description, cfg, fetchFn) {
   if (!cfg || !cfg.consent) throw new Error("सहमति नहीं दी गई, इसलिए कुछ नहीं भेजा गया।");
   if (!cfg.apiKey) throw new Error("API key नहीं है।");
+  const provider = AI_PROVIDERS[cfg.provider || "anthropic"];
+  if (!provider) throw new Error("अज्ञात AI provider।");
   const {system, user} = buildAiMessages(description);
-  const res = await fetchFn(AI_PROVIDER.url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": cfg.apiKey,
-      "anthropic-version": AI_PROVIDER.version,
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({model: AI_PROVIDER.model, max_tokens: 200, system, messages: [{role: "user", content: user}]}),
-  });
+  const req = provider.buildRequest(cfg.apiKey, system, user);
+  const res = await fetchFn(req.url, {method: "POST", headers: req.headers, body: JSON.stringify(req.body)});
   if (!res.ok) throw new Error("AI सेवा से जवाब नहीं मिला (स्थिति " + res.status + ")।");
   const data = await res.json();
-  const text = (data.content || []).map(c => c.text || "").join("");
-  return parseAiReply(text);
+  return parseAiReply(provider.readText(data));
 }
 /*LOGIC_END*/
 
@@ -454,7 +487,8 @@ async function runAi(text) {
   chatLog.push({who:"bot", text:"AI से पूछ रहा हूँ..."});
   renderChat(lastOptions);
   const cfg = {consent: document.getElementById("ai-consent").checked,
-               apiKey: document.getElementById("ai-key").value.trim()};
+               apiKey: document.getElementById("ai-key").value.trim(),
+               provider: document.getElementById("ai-provider").value};
   try {
     const r = await aiSuggest(text, cfg, fetch);
     chatLog.push({who:"bot", text: r.code
