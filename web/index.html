@@ -92,7 +92,14 @@
       <div><button class="btn" id="chat-send">भेजें</button></div>
     </div>
     <button class="btn secondary" id="chat-restart">फिर से शुरू करें</button>
-    <p class="meta">यह नियम-आधारित सहायक है, AI model नहीं। आपका लिखा कहीं नहीं भेजा जाता।</p>
+    <details class="ai-box">
+      <summary>AI मॉडल जोड़ें (वैकल्पिक, पहले सहमति ज़रूरी)</summary>
+      <p class="meta">अगर आप AI चालू करते हैं, तो आपके लिखे कारोबार का विवरण (पहचान और संख्याएँ हटाकर) बाहरी AI सेवा को भेजा जाएगा। बैंक, खाते या लेनदेन का डेटा कभी नहीं भेजा जाता। यह डेटा हम अपने पास नहीं रखते, पर AI सेवा के अपने नियम लागू होंगे। आप कभी भी बंद कर सकते हैं।</p>
+      <label><input type="checkbox" id="ai-consent"> मैं सहमत हूँ कि ऊपर बताया गया कारोबार का विवरण AI सेवा को भेजा जाए</label>
+      <label for="ai-key">आपकी AI API key (यह सिर्फ़ इस ब्राउज़र टैब में रहती है, कहीं सेव नहीं होती)</label>
+      <input type="password" id="ai-key" autocomplete="off" placeholder="API key यहाँ लिखें">
+      <p class="meta" id="ai-status">AI बंद है। सिर्फ़ नियम-आधारित सहायक चलेगा।</p>
+    </details>
   </section>
 
   <!-- MDR panel -->
@@ -366,11 +373,98 @@ function agentStep(state, input) {
   if (input.text && input.text.trim()) { addFromText(s, input.text); return finish(s); }
   return {state:s, bot:["कृपया ऊपर से कोई विकल्प चुनें।"], options:s.options || []};
 }
+// ---------- AI सहायक (वैकल्पिक, केवल सहमति के बाद) ----------
+const AI_PROVIDER = {
+  url: "https://api.anthropic.com/v1/messages",
+  model: "claude-haiku-5-5",
+  version: "2023-06-01",
+};
+
+// भेजने से पहले पहचान और संख्याएँ हटाएँ। यह भेजे जाने वाले विवरण की आख़िरी सुरक्षा है।
+function redact(text) {
+  return String(text || "")
+    .replace(/[\w.\-]+@[\w.\-]+/g, "[पहचान हटाई गई]")
+    .replace(/\d[\d\s\-]{5,}\d/g, "[संख्या हटाई गई]")
+    .trim()
+    .slice(0, 300);
+}
+
+function buildAiMessages(description) {
+  const codes = MCC_TABLE.map(e => `${e.code} = ${e.name} (${e.hindi})`).join("\n");
+  const system =
+    "तुम MCC सुझाने वाले सहायक हो। केवल नीचे दी गई सूची के कोड चुनो। " +
+    'उत्तर सिर्फ़ JSON में दो: {"code": "XXXX" या null, "confidence": 0 से 1, "reason_hi": "हिंदी में एक वाक्य"}। ' +
+    "अगर कारोबार स्पष्ट न हो, तो code null रखो।\n\nसूची:\n" + codes;
+  return {system, user: "कारोबार का विवरण: " + redact(description)};
+}
+
+// AI के जवाब को सूची के सामने जाँचें। सूची से बाहर का कोड स्वीकार नहीं होता।
+function parseAiReply(raw) {
+  const m = String(raw).match(/\{[\s\S]*\}/);
+  if (!m) throw new Error("AI का जवाब समझ नहीं आया।");
+  const obj = JSON.parse(m[0]);
+  const code = obj.code == null ? null : String(obj.code);
+  if (code !== null && !BY_CODE[code]) {
+    return {code: null, confidence: 0, reason: "AI ने सूची से बाहर का कोड दिया, इसलिए उसे छोड़ दिया गया।"};
+  }
+  const confidence = Math.max(0, Math.min(1, Number(obj.confidence) || 0));
+  return {code, confidence, reason: String(obj.reason_hi || "")};
+}
+
+// cfg: {consent: boolean, apiKey: string}. सहमति के बिना कुछ नहीं भेजा जाता।
+async function aiSuggest(description, cfg, fetchFn) {
+  if (!cfg || !cfg.consent) throw new Error("सहमति नहीं दी गई, इसलिए कुछ नहीं भेजा गया।");
+  if (!cfg.apiKey) throw new Error("API key नहीं है।");
+  const {system, user} = buildAiMessages(description);
+  const res = await fetchFn(AI_PROVIDER.url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": cfg.apiKey,
+      "anthropic-version": AI_PROVIDER.version,
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({model: AI_PROVIDER.model, max_tokens: 200, system, messages: [{role: "user", content: user}]}),
+  });
+  if (!res.ok) throw new Error("AI सेवा से जवाब नहीं मिला (स्थिति " + res.status + ")।");
+  const data = await res.json();
+  const text = (data.content || []).map(c => c.text || "").join("");
+  return parseAiReply(text);
+}
 /*LOGIC_END*/
 
 // ---------- MCC सहायक का UI ----------
 let chatLog = [];
 let agentState = null;
+let lastOptions = [];
+
+function aiReady() {
+  const consent = document.getElementById("ai-consent").checked;
+  const key = document.getElementById("ai-key").value.trim();
+  const status = document.getElementById("ai-status");
+  if (consent && key) {
+    status.textContent = "AI चालू है। हर भेजे गए विवरण से पहले आपकी सहमति लागू है।";
+    return true;
+  }
+  status.textContent = "AI बंद है। सहमति देने और API key लिखने पर ही चालू होगा।";
+  return false;
+}
+
+async function runAi(text) {
+  chatLog.push({who:"bot", text:"AI से पूछ रहा हूँ..."});
+  renderChat(lastOptions);
+  const cfg = {consent: document.getElementById("ai-consent").checked,
+               apiKey: document.getElementById("ai-key").value.trim()};
+  try {
+    const r = await aiSuggest(text, cfg, fetch);
+    chatLog.push({who:"bot", text: r.code
+      ? `AI सुझाव: ${r.code} (${BY_CODE[r.code].hindi}), विश्वास ${r.confidence}\n${r.reason}\nयह भी सिर्फ़ सुझाव है।`
+      : "AI इस विवरण से निश्चित नहीं है। ऊपर के सवालों या सूची से चुनें।"});
+  } catch (err) {
+    chatLog.push({who:"bot", text: err.message});
+  }
+  renderChat(lastOptions);
+}
 
 function renderChat(options) {
   const box = document.getElementById("chat");
@@ -391,7 +485,8 @@ function renderChat(options) {
 function showTurn(res) {
   res.bot.forEach(t => chatLog.push({who:"bot", text:t}));
   agentState = res.state;
-  renderChat(res.options);
+  lastOptions = res.options || [];
+  renderChat(lastOptions);
 }
 
 function restartChat() {
@@ -406,6 +501,7 @@ function sendChatText() {
   input.value = "";
   chatLog.push({who:"me", text});
   showTurn(agentStep(agentState, {text}));
+  if (aiReady()) runAi(text);
 }
 
 document.getElementById("chat-send").addEventListener("click", sendChatText);
