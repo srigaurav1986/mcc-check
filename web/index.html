@@ -415,7 +415,8 @@ const AI_PROVIDERS = {
     },
     readText(data) {
       const parts = (((data.candidates || [])[0] || {}).content || {}).parts || [];
-      return parts.map(p => p.text || "").join("");
+      // thinking वाले हिस्से (thought: true) को छोड़ें, केवल असली जवाब लें
+      return parts.filter(p => !p.thought).map(p => p.text || "").join("");
     },
   },
 };
@@ -440,9 +441,15 @@ function buildAiMessages(description) {
 
 // AI के जवाब को सूची के सामने जाँचें। सूची से बाहर का कोड स्वीकार नहीं होता।
 function parseAiReply(raw) {
-  const m = String(raw).match(/\{[\s\S]*\}/);
-  if (!m) throw new Error("AI का जवाब समझ नहीं आया।");
-  const obj = JSON.parse(m[0]);
+  const text = String(raw || "");
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) {
+    const shown = text.trim() ? " जवाब था: \"" + text.trim().slice(0, 120) + "\"" : " जवाब खाली था (शायद सेवा ने सुरक्षा के कारण जवाब रोका)।";
+    throw new Error("AI का जवाब समझ नहीं आया।" + shown);
+  }
+  let obj;
+  try { obj = JSON.parse(m[0]); }
+  catch (e) { throw new Error("AI के JSON में गड़बड़ी थी। फिर से कोशिश करें।"); }
   const code = obj.code == null ? null : String(obj.code);
   if (code !== null && !BY_CODE[code]) {
     return {code: null, confidence: 0, reason: "AI ने सूची से बाहर का कोड दिया, इसलिए उसे छोड़ दिया गया।"};
