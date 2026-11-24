@@ -57,6 +57,7 @@
 <main>
   <div class="notice">
     यह एक अनुमान का उपकरण है। MCC का अंतिम निर्णय आपका acquirer या payment service provider लेता है, और MDR की वास्तविक दर आपका बैंक तय करता है। यह कानूनी या वित्तीय सलाह नहीं है। MCC बदलने के लिए यह tool कोई सलाह नहीं देता।
+    <br><strong>सावधानी:</strong> MCC सूची प्रारंभिक है और पूरी आधिकारिक ISO 18245 सूची से अभी पूरी तरह मिलाई नहीं गई है। UPI MDR की तारीख और दर NPCI की ताज़ा सूचना से ज़रूर जाँचें, क्योंकि उसकी लागू होने की तारीख बदली गई थी।
   </div>
 
   <div class="tabs">
@@ -176,7 +177,9 @@ const MCC_TABLE = [
 ];
 const BY_CODE = Object.fromEntries(MCC_TABLE.map(e => [e.code, e]));
 
-// MDR नियम: प्रकाशित बैंक सूचना पर आधारित डिफ़ॉल्ट, जो बदल सकते हैं।
+// MDR नियम: समाचार स्रोतों (Business Today, Moneylife, Inc42, सितंबर-अक्टूबर 2026) पर आधारित।
+// NPCI के मूल दस्तावेज़ से अभी मिलान बाकी है। तारीख 15 अक्टूबर 2026 से टालने की खबर है।
+// सभी merchant श्रेणियों के लिए एक दर मानी गई है, जो अधूरा हो सकता है।
 const RULES = {
   upi_p2m: {rate:0.004, cap:300, zero_below:2000}
 };
@@ -632,7 +635,7 @@ document.getElementById("mdr-btn").addEventListener("click", () => {
   if (!amount || amount <= 0) { box.innerHTML = '<p class="error">कृपया सही रकम लिखें।</p>'; return; }
   const fee = expectedMdr(amount, RULES.upi_p2m);
   box.innerHTML = `<div class="card"><h3>अनुमानित MDR: ₹${fee.toFixed(2)}</h3>
-    <div class="meta">यह प्रकाशित नियमों पर आधारित अनुमान है। वास्तविक दर आपका बैंक तय करता है। ₹2,000 तक शुल्क शून्य माना गया है, और अधिकतम ₹300 है।</div></div>`;
+    <div class="meta">यह समाचार रिपोर्टों पर आधारित अनुमान है। वास्तविक दर आपका बैंक तय करता है। ₹2,000 तक शुल्क शून्य माना गया है, और अधिकतम ₹300 है। लागू होने की तारीख NPCI की ताज़ा सूचना से जाँचें, क्योंकि उसे टाला गया था।</div></div>`;
 });
 
 document.getElementById("csv-file").addEventListener("change", async e => {
