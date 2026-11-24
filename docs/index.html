@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCC जाँचक</title>
+<style>
+  :root { --bg:#f5f7fa; --card:#ffffff; --ink:#1d2433; --muted:#5b6475; --accent:#1f6feb; --warn:#b45309; --bad:#b42318; --ok:#067647; --line:#d9dee7; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Noto Sans Devanagari", "Mangal", "Nirmala UI", system-ui, sans-serif; background:var(--bg); color:var(--ink); font-size:17px; line-height:1.6; }
+  header { background:var(--card); border-bottom:1px solid var(--line); padding:18px 20px; }
+  header h1 { margin:0 0 4px; font-size:24px; }
+  header p { margin:0; color:var(--muted); font-size:15px; }
+  main { max-width:860px; margin:0 auto; padding:16px; }
+  .notice { background:#fff8e6; border:1px solid #f1d28a; border-radius:10px; padding:12px 14px; font-size:14px; color:#5c4a14; margin-bottom:16px; }
+  .tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .tab { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 16px; font-size:16px; cursor:pointer; font-family:inherit; color:var(--ink); }
+  .tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .panel { display:none; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; }
+  .panel.active { display:block; }
+  label { display:block; font-weight:600; margin:10px 0 6px; }
+  input[type=text], input[type=number], select, textarea { width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:10px; font-size:16px; font-family:inherit; background:#fff; color:var(--ink); }
+  textarea { min-height:140px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size:14px; }
+  .btn { background:var(--accent); color:#fff; border:none; border-radius:10px; padding:11px 18px; font-size:16px; cursor:pointer; font-family:inherit; margin-top:12px; margin-right:6px; }
+  .btn.secondary { background:#eef2f8; color:var(--ink); border:1px solid var(--line); }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  .row > div { flex:1; min-width:180px; }
+  .result { margin-top:16px; }
+  .card { border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:10px; background:#fff; }
+  .card h3 { margin:0 0 6px; font-size:17px; }
+  .card .meta { color:var(--muted); font-size:14px; }
+  .tag { display:inline-block; padding:2px 10px; border-radius:999px; font-size:13px; font-weight:600; margin-right:6px; }
+  .t-over { background:#fdecea; color:var(--bad); }
+  .t-review { background:#fff4e5; color:var(--warn); }
+  .t-under { background:#e6f4ea; color:var(--ok); }
+  .t-info { background:#eef2f8; color:var(--muted); }
+  .draft { white-space:pre-wrap; background:#f7f9fc; border:1px dashed var(--line); border-radius:10px; padding:12px; font-size:14px; display:none; margin-top:10px; }
+  .empty { color:var(--muted); font-style:italic; }
+  .error { color:var(--bad); font-weight:600; margin-top:12px; }
+  .chat { display:flex; flex-direction:column; gap:8px; max-height:420px; overflow:auto; margin-bottom:10px; padding:4px; }
+  .msg { padding:10px 13px; border-radius:12px; max-width:88%; white-space:pre-wrap; font-size:15px; }
+  .msg.bot { background:#eef2f8; align-self:flex-start; }
+  .msg.me { background:var(--accent); color:#fff; align-self:flex-end; }
+  .chat-opts { margin:6px 0; }
+  .chip { display:inline-block; margin:4px 6px 4px 0; padding:8px 13px; border:1px solid var(--line); border-radius:999px; background:#fff; cursor:pointer; font-family:inherit; font-size:15px; color:var(--ink); }
+  .chip:hover { border-color:var(--accent); }
+  footer { color:var(--muted); font-size:13px; text-align:center; padding:24px 12px; }
+  @media (max-width:520px){ body{font-size:16px;} .tab{flex:1;} }
+</style>
+</head>
+<body>
+<header>
+  <h1>MCC जाँचक</h1>
+  <p>दुकान का MCC, MDR का हिसाब, और statement की जाँच। सब कुछ आपके ब्राउज़र में होता है, कोई डेटा कहीं नहीं भेजा जाता।</p>
+</header>
+
+<main>
+  <div class="notice">
+    यह एक अनुमान का उपकरण है। MCC का अंतिम निर्णय आपका acquirer या payment service provider लेता है, और MDR की वास्तविक दर आपका बैंक तय करता है। यह कानूनी या वित्तीय सलाह नहीं है। MCC बदलने के लिए यह tool कोई सलाह नहीं देता।
+    <br><strong>सावधानी:</strong> MCC सूची प्रारंभिक है और पूरी आधिकारिक ISO 18245 सूची से अभी पूरी तरह मिलाई नहीं गई है। UPI MDR की तारीख और दर NPCI की ताज़ा सूचना से ज़रूर जाँचें, क्योंकि उसकी लागू होने की तारीख बदली गई थी।
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="p-mcc">MCC खोजें</button>
+    <button class="tab" data-tab="p-agent">MCC सहायक (बातचीत)</button>
+    <button class="tab" data-tab="p-mdr">MDR हिसाब</button>
+    <button class="tab" data-tab="p-audit">Statement जाँच</button>
+  </div>
+
+  <!-- MCC panel -->
+  <section class="panel active" id="p-mcc">
+    <label for="mcc-name">दुकान या merchant का नाम (हिंदी या अंग्रेज़ी में)</label>
+    <input type="text" id="mcc-name" placeholder="जैसे: गुप्ता मेडिकल हॉल" autocomplete="off">
+    <label for="mcc-category">या अपना कारोबार चुनें (नाम में शब्द न हो तो यह उपयोगी है)</label>
+    <select id="mcc-category"><option value="">— कारोबार चुनें —</option></select>
+    <button class="btn" id="mcc-btn">संकेत देखें</button>
+    <div class="result" id="mcc-result"></div>
+
+    <label for="mcc-code">या MCC कोड लिखकर उसका अर्थ देखें</label>
+    <div class="row">
+      <div><input type="text" id="mcc-code" placeholder="जैसे: 5411"></div>
+      <div><button class="btn secondary" id="code-btn">अर्थ देखें</button></div>
+    </div>
+    <div class="result" id="code-result"></div>
+  </section>
+
+  <!-- Agent panel -->
+  <section class="panel" id="p-agent">
+    <div class="chat" id="chat"></div>
+    <div class="chat-opts" id="chat-opts"></div>
+    <div class="row">
+      <div><input type="text" id="chat-input" placeholder="यहाँ हिंदी में लिखें" autocomplete="off"></div>
+      <div><button class="btn" id="chat-send">भेजें</button></div>
+    </div>
+    <button class="btn secondary" id="chat-restart">फिर से शुरू करें</button>
+    <details class="ai-box">
+      <summary>AI मॉडल जोड़ें (वैकल्पिक, पहले सहमति ज़रूरी)</summary>
+      <p class="meta">अगर आप AI चालू करते हैं, तो आपके लिखे कारोबार का विवरण (पहचान और संख्याएँ हटाकर) चुनी गई बाहरी AI सेवा को भेजा जाएगा। बैंक, खाते या लेनदेन का डेटा कभी नहीं भेजा जाता। यह डेटा हम अपने पास नहीं रखते, पर AI सेवा के अपने नियम लागू होंगे। Gemini की free tier पर Google आपका भेजा विवरण अपने उत्पाद सुधार के लिए इस्तेमाल कर सकता है। आप कभी भी बंद कर सकते हैं।</p>
+      <label for="ai-provider">AI सेवा चुनें</label>
+      <select id="ai-provider">
+        <option value="gemini">Google Gemini (free tier उपलब्ध)</option>
+        <option value="anthropic">Anthropic Claude</option>
+      </select>
+      <label><input type="checkbox" id="ai-consent"> मैं सहमत हूँ कि ऊपर बताया गया कारोबार का विवरण चुनी गई AI सेवा को भेजा जाए</label>
+      <label for="ai-key">आपकी AI API key (यह सिर्फ़ इस ब्राउज़र टैब में रहती है, कहीं सेव नहीं होती)</label>
+      <input type="password" id="ai-key" autocomplete="off" placeholder="API key यहाँ लिखें">
+      <p class="meta" id="ai-status">AI बंद है। सिर्फ़ नियम-आधारित सहायक चलेगा।</p>
+    </details>
+  </section>
+
+  <!-- MDR panel -->
+  <section class="panel" id="p-mdr">
+    <div class="row">
+      <div>
+        <label for="mdr-amount">लेनदेन की रकम (₹)</label>
+        <input type="number" id="mdr-amount" min="0" step="0.01" placeholder="जैसे: 2500">
+      </div>
+      <div>
+        <label for="mdr-instrument">भुगतान का माध्यम</label>
+        <select id="mdr-instrument"><option value="upi_p2m">UPI (सामान्य merchant भुगतान)</option></select>
+      </div>
+    </div>
+    <button class="btn" id="mdr-btn">MDR निकालें</button>
+    <div class="result" id="mdr-result"></div>
+  </section>
+
+  <!-- Audit panel -->
+  <section class="panel" id="p-audit">
+    <label for="csv-file">Statement CSV फ़ाइल चुनें</label>
+    <input type="file" id="csv-file" accept=".csv,text/csv">
+    <label for="csv-text">या नीचे सीधे CSV लिखें या चिपकाएँ</label>
+    <textarea id="csv-text" placeholder="date,amount,mdr_charged,merchant_name,assigned_mcc,instrument"></textarea>
+    <button class="btn secondary" id="sample-btn">नमूना लोड करें</button>
+    <button class="btn" id="audit-btn">जाँच करें</button>
+    <div class="result" id="audit-result"></div>
+  </section>
+</main>
+
+<footer>
+  मसौदे केवल समीक्षा का अनुरोध हैं। अंतिम निर्णय आपके acquirer या NPCI का होगा।
+</footer>
+
+<script>
+/*LOGIC_START*/
+// MCC डेटा: ISO 18245 का प्रारंभिक उपसमुच्चय, भारतीय keywords के साथ।
+const MCC_TABLE = [
+  {code:"0742", name:"Veterinary Services", hindi:"पशु चिकित्सा", kw:["veterinary","vet clinic","पशु चिकित्सा","पशु अस्पताल"]},
+  {code:"3020", name:"Airlines", hindi:"एयरलाइन", kw:["airline","airways","flight","एयरलाइन"]},
+  {code:"4111", name:"Local and Suburban Commuter Transport", hindi:"स्थानीय परिवहन", kw:["metro","local train","suburban","मेट्रो"]},
+  {code:"4112", name:"Passenger Railways", hindi:"रेलवे", kw:["railway","railways","irctc","रेलवे"]},
+  {code:"4121", name:"Taxicabs and Limousines", hindi:"टैक्सी", kw:["taxi","cab","टैक्सी"]},
+  {code:"4131", name:"Bus Lines", hindi:"बस सेवा", kw:["bus","redbus","abhibus","बस"]},
+  {code:"4215", name:"Courier Services", hindi:"कूरियर", kw:["courier","logistics","shipping","कूरियर"]},
+  {code:"4722", name:"Travel Agencies and Tour Operators", hindi:"यात्रा एजेंसी", kw:["travel","tours","tour operator","holidays","यात्रा"]},
+  {code:"4814", name:"Telecommunication Services", hindi:"दूरसंचार", kw:["telecom","mobile recharge","airtel","jio","vodafone","बीएसएनएल","मोबाइल रिचार्ज"]},
+  {code:"4900", name:"Utilities", hindi:"बिजली, पानी, गैस बिल", kw:["electricity","water bill","gas bill","utility","बिजली","पानी बिल"]},
+  {code:"5411", name:"Grocery Stores, Supermarkets", hindi:"किराना और सुपरमार्केट", kw:["grocery","kirana","supermarket","provision","किराना"]},
+  {code:"5541", name:"Service Stations", hindi:"पेट्रोल पंप", kw:["petrol","petrol pump","fuel","service station","पेट्रोल","पेट्रोल पंप"]},
+  {code:"5651", name:"Family Clothing Stores", hindi:"कपड़ों की दुकान", kw:["clothing","garments","garment","apparel","boutique","hosiery","textile","textiles","cloth","cloth house","saree","sarees","readymade","fabric","कपड़े","कपड़ा","साड़ी","होजरी","हौज़री","टेक्सटाइल"]},
+  {code:"5137", name:"Men's, Women's, and Children's Uniforms", hindi:"यूनिफ़ॉर्म", kw:["uniform","uniforms","school uniform","यूनिफ़ॉर्म","यूनिफॉर्म","वर्दी"]},
+  {code:"5691", name:"Men's and Women's Clothing Stores", hindi:"पुरुष और महिला कपड़े", kw:["tailor","tailors","tailoring","darzi","दर्जी","दर्ज़ी","टेलर","सिलाई"]},
+  {code:"5732", name:"Electronics Stores", hindi:"इलेक्ट्रॉनिक्स", kw:["electronics","mobile shop","computer shop","इलेक्ट्रॉनिक्स"]},
+  {code:"5812", name:"Eating Places, Restaurants", hindi:"रेस्टोरेंट और ढाबा", kw:["restaurant","dhaba","cafe","bhojanalaya","ढाबा","रेस्टोरेंट","होटल"]},
+  {code:"5814", name:"Fast Food Restaurants", hindi:"फास्ट फ़ूड", kw:["fast food","pizza","burger","roll","chaat","चाट"]},
+  {code:"5912", name:"Drug Stores, Pharmacies", hindi:"दवा दुकान", kw:["pharmacy","medical","medicals","chemist","dawai","मेडिकल","दवाई","दवा"]},
+  {code:"5999", name:"Miscellaneous and Specialty Retail Stores", hindi:"विविध खुदरा दुकान", kw:[]},
+  {code:"6012", name:"Financial Institutions", hindi:"वित्तीय संस्थान", kw:["loan","emi","nbfc","लोन","ईएमआई"]},
+  {code:"6300", name:"Insurance Sales, Underwriting", hindi:"बीमा", kw:["insurance","premium","बीमा"]},
+  {code:"7011", name:"Hotels, Motels, Resorts", hindi:"होटल और रिसॉर्ट", kw:["hotel","resort","lodge","guest house","होटल","रिसॉर्ट"]},
+  {code:"7322", name:"Debt Collection Agencies", hindi:"वसूली एजेंसी", kw:["debt collection","recovery agency","वसूली"]},
+  {code:"7832", name:"Motion Picture Theaters", hindi:"सिनेमा", kw:["cinema","movie","multiplex","theatre","सिनेमा"]},
+  {code:"8062", name:"Hospitals", hindi:"अस्पताल", kw:["hospital","nursing home","अस्पताल"]},
+  {code:"8099", name:"Medical Services and Health Practitioners", hindi:"स्वास्थ्य सेवा", kw:["clinic","diagnostic","diagnostics","lab","dental","doctor","क्लिनिक","लैब"]},
+  {code:"8211", name:"Elementary and Secondary Schools", hindi:"स्कूल", kw:["school","vidyalaya","स्कूल","विद्यालय"]},
+  {code:"8220", name:"Colleges and Universities", hindi:"कॉलेज और विश्वविद्यालय", kw:["college","university","institute","कॉलेज","विश्वविद्यालय"]},
+  {code:"8398", name:"Charitable and Social Service Organizations", hindi:"दान और सामाजिक संस्था", kw:["donation","charity","trust","ngo","दान"]},
+  {code:"9311", name:"Tax Payments", hindi:"कर भुगतान", kw:["tax","income tax","gst payment","कर"]},
+  {code:"9399", name:"Government Services", hindi:"सरकारी सेवा", kw:["government","municipal","govt","सरकारी","नगर निगम"]},
+];
+const BY_CODE = Object.fromEntries(MCC_TABLE.map(e => [e.code, e]));
+
+// MDR नियम: समाचार स्रोतों (Business Today, Moneylife, Inc42, सितंबर-अक्टूबर 2026) पर आधारित।
+// NPCI के मूल दस्तावेज़ से अभी मिलान बाकी है। तारीख 15 अक्टूबर 2026 से टालने की खबर है।
+// सभी merchant श्रेणियों के लिए एक दर मानी गई है, जो अधूरा हो सकता है।
+const RULES = {
+  upi_p2m: {rate:0.004, cap:300, zero_below:2000}
+};
+
+function normalize(text) {
+  const t = (text || "").toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, " ").trim().split(/\s+/).join(" ");
+  return " " + t + " ";
+}
+
+function suggest(text, limit = 3) {
+  const h = normalize(text);
+  const res = [];
+  for (const e of MCC_TABLE) {
+    const matched = e.kw.filter(k => h.includes(" " + k + " "));
+    if (matched.length) {
+      const score = matched.reduce((s, k) => s + [...k].length, 0);
+      res.push({code:e.code, name:e.name, hindi:e.hindi, score, matched});
+    }
+  }
+  res.sort((a, b) => (b.score - a.score) || a.code.localeCompare(b.code));
+  return res.slice(0, limit);
+}
+
+function confidence(res) {
+  if (!res.length) return 0;
+  const total = res.reduce((s, r) => s + r.score, 0);
+  return Math.round((res[0].score / total) * 100) / 100;
+}
+
+function expectedMdr(amount, rule) {
+  if (amount <= rule.zero_below) return 0;
+  let fee = amount * rule.rate;
+  if (rule.cap != null) fee = Math.min(fee, rule.cap);
+  return Math.round((fee + Number.EPSILON) * 100) / 100;
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = "", quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; } else quoted = false;
+      } else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else if (c !== "\r") field += c;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim() !== ""));
+}
+
+function audit(text, tolerance = 0.05, reviewConfidence = 0.5) {
+  const rows = parseCsv(text);
+  if (!rows.length) throw new Error("फ़ाइल खाली है।");
+  const headers = rows[0].map(h => h.trim());
+  const required = ["date", "amount", "mdr_charged", "merchant_name", "assigned_mcc"];
+  const missing = required.filter(r => !headers.includes(r));
+  if (missing.length) throw new Error("ज़रूरी कॉलम नहीं मिले: " + missing.join(", "));
+
+  const findings = [], errors = [];
+  rows.slice(1).forEach((cells, idx) => {
+    const lineNo = idx + 2;
+    const raw = {};
+    headers.forEach((h, i) => raw[h] = (cells[i] || "").trim());
+    const amount = Number(raw.amount);
+    const charged = Number(raw.mdr_charged || "0");
+    const instrument = raw.instrument || "upi_p2m";
+    if (!raw.date || isNaN(amount) || amount <= 0 || isNaN(charged)) {
+      errors.push("पंक्ति " + lineNo + ": रकम, शुल्क या तारीख गलत है।");
+      return;
+    }
+    const row = {date: raw.date, amount, charged, merchant: raw.merchant_name, assigned: raw.assigned_mcc, instrument};
+
+    const rule = RULES[instrument];
+    if (!rule) {
+      findings.push({kind:"NO_RULE", row, message:"इस माध्यम के लिए नियम उपलब्ध नहीं है, जाँच छोड़ी गई।"});
+    } else {
+      const expected = expectedMdr(amount, rule);
+      const diff = Math.round((charged - expected) * 100) / 100;
+      if (diff > tolerance) {
+        findings.push({kind:"OVERCHARGE", row, expected, message:`कटा शुल्क ₹${charged} है, नियम से ₹${expected} बनता है। अंतर ₹${diff}।`});
+      } else if (diff < -tolerance) {
+        findings.push({kind:"UNDERCHARGE", row, expected, message:`कटा शुल्क ₹${charged} है, नियम से ₹${expected} बनता है। यह जानकारी के लिए है।`});
+      }
+    }
+
+    const res = suggest(row.merchant);
+    const top = res[0];
+    if (top && top.code !== row.assigned && confidence(res) >= reviewConfidence) {
+      findings.push({kind:"MCC_REVIEW", row, suggested: top.code,
+        message:`नाम के संकेत '${top.matched.join(", ")}' से ${top.code} (${top.name}) दिखता है, जबकि assign किया गया MCC ${row.assigned} है। यह समीक्षा का संकेत है, निर्णय नहीं।`});
+    }
+  });
+  return {findings, errors};
+}
+
+function disputeDraft(f) {
+  const r = f.row;
+  const title = {OVERCHARGE:"MDR अधिक कटने की समीक्षा", MCC_REVIEW:"MCC वर्गीकरण की समीक्षा"}[f.kind] || "जाँच";
+  const label = c => (BY_CODE[c] ? BY_CODE[c].hindi : "अज्ञात");
+  const lines = [
+    "विषय: " + title, "",
+    "तारीख: " + r.date,
+    "Merchant का नाम: " + (r.merchant || "उपलब्ध नहीं"),
+    "रकम: ₹" + r.amount,
+    "कटा MDR: ₹" + r.charged,
+    "Assign किया गया MCC: " + r.assigned + " (" + label(r.assigned) + ")",
+  ];
+  if (f.expected != null) lines.push("नियम से अपेक्षित MDR: ₹" + f.expected);
+  if (f.suggested) lines.push("नाम के आधार पर संकेतित MCC: " + f.suggested + " (" + label(f.suggested) + ")");
+  lines.push("", "जाँच का परिणाम: " + f.message, "",
+    "अनुरोध: कृपया इस लेनदेन के MCC वर्गीकरण और लागू MDR की समीक्षा करें।",
+    "यह जाँच एक अनुमान पर आधारित है। अंतिम निर्णय acquirer या NPCI का होगा.");
+  return lines.join("\n");
+}
+// ---------- MCC सहायक (नियम-आधारित संवाद) ----------
+const AGENT_GREETING = "नमस्ते! मैं MCC सहायक हूँ। दुकान का नाम लिखें, और बताएँ कि आप मुख्य रूप से क्या बेचते या देते हैं। मैं ज़रूरत हो तो एक-दो सवाल पूछकर संभावित MCC सुझाऊँगा।";
+
+const FOLLOW_GROUPS = [
+  {id:"food", codes:["5812","5814"], question:"ग्राहक यहाँ बैठकर खाते हैं, या सिर्फ़ पैक या डिलीवरी लेते हैं?",
+    options:[{label:"बैठकर खाते हैं", code:"5812"},{label:"सिर्फ़ पैक या डिलीवरी", code:"5814"}]},
+  {id:"health", codes:["5912","8099","8062"], question:"आप मुख्य रूप से दवा बेचते हैं, या जाँच या इलाज की सेवा देते हैं?",
+    options:[{label:"दवा बेचते हैं", code:"5912"},{label:"जाँच या इलाज सेवा", code:"8099"}]},
+  {id:"retail", codes:["5411","5651","5732","5999","5541"], question:"दुकान में ज़्यादातर क्या बिकता है?",
+    options:[{label:"किराना", code:"5411"},{label:"कपड़े", code:"5651"},{label:"इलेक्ट्रॉनिक्स", code:"5732"},{label:"अन्य सामान", code:"5999"}]},
+];
+
+const CATEGORY_OPTIONS = [
+  {label:"किराना", code:"5411"}, {label:"कपड़े", code:"5651"}, {label:"दवा", code:"5912"},
+  {label:"रेस्टोरेंट या ढाबा", code:"5812"}, {label:"पेट्रोल पंप", code:"5541"}, {label:"इलेक्ट्रॉनिक्स", code:"5732"},
+  {label:"क्लिनिक या जाँच", code:"8099"}, {label:"स्कूल", code:"8211"}, {label:"मोबाइल या दूरसंचार", code:"4814"},
+  {label:"होटल", code:"7011"}, {label:"अन्य", code:"5999"},
+];
+
+function agentStart() {
+  return {state:{phase:"start", scores:{}, reasons:[]}, bot:[AGENT_GREETING], options:[]};
+}
+
+function addFromText(s, text) {
+  for (const r of suggest(text, 5)) {
+    s.scores[r.code] = (s.scores[r.code] || 0) + r.score;
+    s.reasons.push(`"${r.matched.join(", ")}" से ${r.code} (${BY_CODE[r.code].hindi})`);
+  }
+}
+
+function addChoice(s, code, label, weight) {
+  s.scores[code] = (s.scores[code] || 0) + weight;
+  s.reasons.push(`आपका चुनाव: ${label}`);
+}
+
+function topEntries(s) {
+  return Object.entries(s.scores).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+function finish(s) {
+  const entries = topEntries(s);
+  if (!entries.length) {
+    return {state:{...s, phase:"category", options:CATEGORY_OPTIONS}, bot:["अभी संकेत नहीं मिला। नीचे से कारोबार चुनें।"], options:CATEGORY_OPTIONS};
+  }
+  const total = entries.reduce((t, e) => t + e[1], 0);
+  const [code, best] = entries[0];
+  const conf = Math.round((best / total) * 100) / 100;
+  const e = BY_CODE[code];
+  const lines = [`सुझाया गया MCC: ${code} (${e.hindi})`, `अंग्रेज़ी नाम: ${e.name}`, `विश्वास: ${conf}`];
+  if (s.reasons.length) lines.push("कारण: " + s.reasons.join("; "));
+  lines.push("यह सिर्फ़ सुझाव है। अंतिम MCC आपका acquirer या payment processor तय करता है।");
+  return {state:{...s, phase:"done"}, bot:[lines.join("\n")], options:[{label:"फिर से शुरू करें", restart:true}]};
+}
+
+function afterText(s) {
+  const entries = topEntries(s);
+  if (!entries.length) {
+    return {state:{...s, phase:"category", options:CATEGORY_OPTIONS}, bot:["नाम से कारोबार समझ नहीं आया। नीचे से चुनें।"], options:CATEGORY_OPTIONS};
+  }
+  const [top, best] = entries[0];
+  const total = entries.reduce((t, e) => t + e[1], 0);
+  const conf = best / total;
+  const group = FOLLOW_GROUPS.find(g => g.codes.includes(top));
+  if (group && conf < 0.8) {
+    return {state:{...s, phase:"follow", options:group.options}, bot:[group.question], options:group.options};
+  }
+  return finish(s);
+}
+
+// input: {text} या {code, label}
+function agentStep(state, input) {
+  const s = {...state, scores:{...state.scores}, reasons:[...state.reasons]};
+  if (s.phase === "done") {
+    return {state:s, bot:["नई खोज के लिए फिर से शुरू करें।"], options:[{label:"फिर से शुरू करें", restart:true}]};
+  }
+  if (s.phase === "start") {
+    if (input.text && input.text.trim()) { addFromText(s, input.text); return afterText(s); }
+    return {state:s, bot:["कृपया दुकान का नाम या कारोबार लिखें।"], options:[]};
+  }
+  if (input.code) { addChoice(s, input.code, input.label, s.phase === "follow" ? 8 : 10); return finish(s); }
+  if (input.text && input.text.trim()) { addFromText(s, input.text); return finish(s); }
+  return {state:s, bot:["कृपया ऊपर से कोई विकल्प चुनें।"], options:s.options || []};
+}
+// ---------- AI सहायक (वैकल्पिक, केवल सहमति के बाद) ----------
+// हर provider का endpoint, model और request/response का तरीका अलग है।
+const AI_PROVIDERS = {
+  anthropic: {
+    label: "Anthropic Claude",
+    url: "https://api.anthropic.com/v1/messages",
+    model: "claude-haiku-5-5",
+    buildRequest(key, system, user) {
+      return {
+        url: this.url,
+        headers: {
+          "content-type": "application/json",
+          "x-api-key": key,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: {model: this.model, max_tokens: 400, system, messages: [{role: "user", content: user}]},
+      };
+    },
+    readText(data) { return (data.content || []).map(c => c.text || "").join(""); },
+  },
+  gemini: {
+    label: "Google Gemini (free tier पर आपका विवरण Google सुधार के लिए इस्तेमाल कर सकता है)",
+    model: "gemini-3.5-flash",
+    buildRequest(key, system, user) {
+      return {
+        url: "https://generativelanguage.googleapis.com/v1beta/models/" + this.model + ":generateContent",
+        headers: {"content-type": "application/json", "x-goog-api-key": key},
+        body: {
+          systemInstruction: {parts: [{text: system}]},
+          contents: [{role: "user", parts: [{text: user}]}],
+          generationConfig: {maxOutputTokens: 1024, responseMimeType: "application/json"},
+        },
+      };
+    },
+    readText(data) {
+      const cand = (data.candidates || [])[0] || {};
+      // Gemini का "सोच" वाला हिस्सा भी इसी सीमा में गिना जाता है। सीमा खत्म हो तो साफ़ बताएँ।
+      if (cand.finishReason === "MAX_TOKENS") throw new Error("AI का जवाब बीच में रुक गया (सीमा पूरी हुई)। फिर से कोशिश करें।");
+      const parts = (cand.content || {}).parts || [];
+      // thinking वाले हिस्से (thought: true) को छोड़ें, केवल असली जवाब लें
+      return parts.filter(p => !p.thought).map(p => p.text || "").join("");
+    },
+  },
+};
+
+// भेजने से पहले पहचान और संख्याएँ हटाएँ। यह भेजे जाने वाले विवरण की आख़िरी सुरक्षा है।
+function redact(text) {
+  return String(text || "")
+    .replace(/[\w.\-]+@[\w.\-]+/g, "[पहचान हटाई गई]")
+    .replace(/\d[\d\s\-]{5,}\d/g, "[संख्या हटाई गई]")
+    .trim()
+    .slice(0, 300);
+}
+
+function buildAiMessages(description) {
+  const codes = MCC_TABLE.map(e => `${e.code} = ${e.name} (${e.hindi})`).join("\n");
+  const system =
+    "तुम MCC सुझाने वाले सहायक हो। केवल नीचे दी गई सूची के कोड चुनो। " +
+    'उत्तर सिर्फ़ JSON में दो: {"code": "XXXX" या null, "confidence": 0 से 1, "reason_hi": "हिंदी में एक वाक्य"}। ' +
+    "अगर कारोबार स्पष्ट न हो, तो code null रखो।\n\nसूची:\n" + codes;
+  return {system, user: "कारोबार का विवरण: " + redact(description)};
+}
+
+// AI के जवाब को सूची के सामने जाँचें। सूची से बाहर का कोड स्वीकार नहीं होता।
+function parseAiReply(raw) {
+  const text = String(raw || "");
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) {
+    const shown = text.trim() ? " जवाब था: \"" + text.trim().slice(0, 120) + "\"" : " जवाब खाली था (शायद सेवा ने सुरक्षा के कारण जवाब रोका)।";
+    throw new Error("AI का जवाब समझ नहीं आया।" + shown);
+  }
+  let obj;
+  try { obj = JSON.parse(m[0]); }
+  catch (e) { throw new Error("AI के JSON में गड़बड़ी थी। फिर से कोशिश करें।"); }
+  const code = obj.code == null ? null : String(obj.code);
+  if (code !== null && !BY_CODE[code]) {
+    return {code: null, confidence: 0, reason: "AI ने सूची से बाहर का कोड दिया, इसलिए उसे छोड़ दिया गया।"};
+  }
+  const confidence = Math.max(0, Math.min(1, Number(obj.confidence) || 0));
+  return {code, confidence, reason: String(obj.reason_hi || "")};
+}
+
+// cfg: {consent, apiKey, provider: "anthropic" | "gemini"}. सहमति के बिना कुछ नहीं भेजा जाता।
+async function aiSuggest(description, cfg, fetchFn) {
+  if (!cfg || !cfg.consent) throw new Error("सहमति नहीं दी गई, इसलिए कुछ नहीं भेजा गया।");
+  if (!cfg.apiKey) throw new Error("API key नहीं है।");
+  const provider = AI_PROVIDERS[cfg.provider || "anthropic"];
+  if (!provider) throw new Error("अज्ञात AI provider।");
+  const {system, user} = buildAiMessages(description);
+  const req = provider.buildRequest(cfg.apiKey, system, user);
+  const res = await fetchFn(req.url, {method: "POST", headers: req.headers, body: JSON.stringify(req.body)});
+  if (!res.ok) throw new Error("AI सेवा से जवाब नहीं मिला (स्थिति " + res.status + ")।");
+  const data = await res.json();
+  return parseAiReply(provider.readText(data));
+}
+/*LOGIC_END*/
+
+// ---------- MCC सहायक का UI ----------
+let chatLog = [];
+let agentState = null;
+let lastOptions = [];
+
+function aiReady() {
+  const consent = document.getElementById("ai-consent").checked;
+  const key = document.getElementById("ai-key").value.trim();
+  const status = document.getElementById("ai-status");
+  if (consent && key) {
+    status.textContent = "AI चालू है। हर भेजे गए विवरण से पहले आपकी सहमति लागू है।";
+    return true;
+  }
+  status.textContent = "AI बंद है। सहमति देने और API key लिखने पर ही चालू होगा।";
+  return false;
+}
+
+async function runAi(text) {
+  chatLog.push({who:"bot", text:"AI से पूछ रहा हूँ..."});
+  renderChat(lastOptions);
+  const cfg = {consent: document.getElementById("ai-consent").checked,
+               apiKey: document.getElementById("ai-key").value.trim(),
+               provider: document.getElementById("ai-provider").value};
+  try {
+    const r = await aiSuggest(text, cfg, fetch);
+    chatLog.push({who:"bot", text: r.code
+      ? `AI सुझाव: ${r.code} (${BY_CODE[r.code].hindi}), विश्वास ${r.confidence}\n${r.reason}\nयह भी सिर्फ़ सुझाव है।`
+      : "AI इस विवरण से निश्चित नहीं है। ऊपर के सवालों या सूची से चुनें।"});
+  } catch (err) {
+    chatLog.push({who:"bot", text: err.message});
+  }
+  renderChat(lastOptions);
+}
+
+function renderChat(options) {
+  const box = document.getElementById("chat");
+  box.innerHTML = chatLog.map(m => `<div class="msg ${m.who}">${esc(m.text)}</div>`).join("");
+  box.scrollTop = box.scrollHeight;
+  const optBox = document.getElementById("chat-opts");
+  optBox.innerHTML = (options || []).map((o, i) => `<button class="chip" data-opt="${i}">${esc(o.label)}</button>`).join("");
+  optBox.querySelectorAll("[data-opt]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const opt = options[Number(btn.dataset.opt)];
+      if (opt.restart) return restartChat();
+      chatLog.push({who:"me", text:opt.label});
+      showTurn(agentStep(agentState, {code: opt.code, label: opt.label}));
+    });
+  });
+}
+
+function showTurn(res) {
+  res.bot.forEach(t => chatLog.push({who:"bot", text:t}));
+  agentState = res.state;
+  lastOptions = res.options || [];
+  renderChat(lastOptions);
+}
+
+function restartChat() {
+  chatLog = [];
+  showTurn(agentStart());
+}
+
+function sendChatText() {
+  const input = document.getElementById("chat-input");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  chatLog.push({who:"me", text});
+  showTurn(agentStep(agentState, {text}));
+  if (aiReady()) runAi(text);
+}
+
+document.getElementById("chat-send").addEventListener("click", sendChatText);
+document.getElementById("chat-input").addEventListener("keydown", e => { if (e.key === "Enter") sendChatText(); });
+document.getElementById("chat-restart").addEventListener("click", restartChat);
+restartChat();
+
+// ---------- UI ----------
+const SAMPLE = `date,amount,mdr_charged,merchant_name,assigned_mcc,instrument
+2026-11-02,2500,10.00,Sharma Kirana Store,5411,upi_p2m
+2026-11-03,5000,25.00,Gupta Medical Hall,5999,upi_p2m
+2026-11-04,1500,0.00,Ravi Dhaba,5812,upi_p2m
+2026-11-05,3000,12.00,City Petrol Pump,5541,upi_p2m`;
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(btn.dataset.tab).classList.add("active");
+  });
+});
+
+function renderMccResults(list, box) {
+  if (!list.length) {
+    box.innerHTML = '<p class="empty">नाम में कोई पहचाना शब्द नहीं मिला। जैसे "किराना", "दवा", "ढाबा", "पेट्रोल पंप" लिखें, या ऊपर से कारोबार चुनें।</p>';
+    return;
+  }
+  const conf = confidence(list);
+  box.innerHTML = list.map(r =>
+    `<div class="card"><h3>${esc(r.code)}: ${esc(r.hindi)}</h3>
+     <div class="meta">${esc(r.name)} · मिले शब्द: ${esc(r.matched.join(", "))}</div></div>`
+  ).join("") + (list[0].matched[0] === "आपका चुनाव"
+    ? `<p class="meta">आपने यह कारोबार चुना है। अंतिम MCC acquirer तय करता है।</p>`
+    : `<p class="meta">विश्वास: ${conf}। यह केवल संकेत है, अंतिम MCC acquirer तय करता है।</p>`);
+}
+
+// कारोबार की सूची भरें
+const catSelect = document.getElementById("mcc-category");
+MCC_TABLE.forEach(e => {
+  const opt = document.createElement("option");
+  opt.value = e.code;
+  opt.textContent = e.hindi;
+  catSelect.appendChild(opt);
+});
+
+function runMccSearch() {
+  const box = document.getElementById("mcc-result");
+  const name = document.getElementById("mcc-name").value.trim();
+  const category = catSelect.value;
+  if (!name && !category) {
+    box.innerHTML = '<p class="error">पहले दुकान का नाम लिखें, या ऊपर से कारोबार चुनें।</p>';
+    return;
+  }
+  let list = suggest(name);
+  if (category) {
+    // चुना गया कारोबार सबसे ऊपर रखें
+    const chosen = BY_CODE[category];
+    list = [{code: chosen.code, name: chosen.name, hindi: chosen.hindi, score: 0, matched: ["आपका चुनाव"]},
+            ...list.filter(r => r.code !== category)];
+  }
+  renderMccResults(list, box);
+}
+
+document.getElementById("mcc-btn").addEventListener("click", runMccSearch);
+document.getElementById("mcc-name").addEventListener("keydown", e => { if (e.key === "Enter") runMccSearch(); });
+
+document.getElementById("code-btn").addEventListener("click", () => {
+  const code = document.getElementById("mcc-code").value.trim();
+  const box = document.getElementById("code-result");
+  const e = BY_CODE[code];
+  box.innerHTML = e
+    ? `<div class="card"><h3>${esc(e.code)}: ${esc(e.hindi)}</h3><div class="meta">${esc(e.name)}</div></div>`
+    : `<p class="empty">MCC ${esc(code)} हमारी सूची में नहीं है। आधिकारिक ISO 18245 सूची देखें।</p>`;
+});
+
+document.getElementById("mdr-btn").addEventListener("click", () => {
+  const amount = Number(document.getElementById("mdr-amount").value);
+  const box = document.getElementById("mdr-result");
+  if (!amount || amount <= 0) { box.innerHTML = '<p class="error">कृपया सही रकम लिखें।</p>'; return; }
+  const fee = expectedMdr(amount, RULES.upi_p2m);
+  box.innerHTML = `<div class="card"><h3>अनुमानित MDR: ₹${fee.toFixed(2)}</h3>
+    <div class="meta">यह समाचार रिपोर्टों पर आधारित अनुमान है। वास्तविक दर आपका बैंक तय करता है। ₹2,000 तक शुल्क शून्य माना गया है, और अधिकतम ₹300 है। लागू होने की तारीख NPCI की ताज़ा सूचना से जाँचें, क्योंकि उसे टाला गया था।</div></div>`;
+});
+
+document.getElementById("csv-file").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (file) document.getElementById("csv-text").value = await file.text();
+});
+
+document.getElementById("sample-btn").addEventListener("click", () => {
+  document.getElementById("csv-text").value = SAMPLE;
+});
+
+document.getElementById("audit-btn").addEventListener("click", () => {
+  const box = document.getElementById("audit-result");
+  const text = document.getElementById("csv-text").value;
+  if (!text.trim()) { box.innerHTML = '<p class="error">पहले CSV फ़ाइल चुनें या डेटा चिपकाएँ।</p>'; return; }
+  let out;
+  try { out = audit(text); }
+  catch (err) { box.innerHTML = `<p class="error">${esc(err.message)}</p>`; return; }
+
+  const tagFor = k => ({OVERCHARGE:'<span class="tag t-over">अधिक शुल्क</span>', MCC_REVIEW:'<span class="tag t-review">MCC समीक्षा</span>', UNDERCHARGE:'<span class="tag t-under">कम शुल्क</span>', NO_RULE:'<span class="tag t-info">नियम नहीं</span>'}[k] || "");
+  let html = "";
+  if (out.errors.length) html += out.errors.map(e => `<p class="error">${esc(e)}</p>`).join("");
+  if (!out.findings.length) {
+    html += '<p class="empty">कोई जाँच-योग्य गड़बड़ी नहीं मिली।</p>';
+  } else {
+    out.findings.forEach((f, i) => {
+      const draftable = f.kind === "OVERCHARGE" || f.kind === "MCC_REVIEW";
+      html += `<div class="card">${tagFor(f.kind)}<h3>${esc(f.row.date)} · ${esc(f.row.merchant)}</h3>
+        <div class="meta">${esc(f.message)}</div>
+        ${draftable ? `<button class="btn secondary" data-draft="${i}">बैंक को भेजने का मसौदा</button>
+        <pre class="draft" id="draft-${i}">${esc(disputeDraft(f))}</pre>` : ""}</div>`;
+    });
+  }
+  box.innerHTML = html;
+
+  box.querySelectorAll("[data-draft]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const d = document.getElementById("draft-" + btn.dataset.draft);
+      const visible = d.style.display === "block";
+      d.style.display = visible ? "none" : "block";
+      btn.textContent = visible ? "बैंक को भेजने का मसौदा" : "मसौदा छिपाएँ";
+    });
+  });
+});
+</script>
+</body>
+</html>
